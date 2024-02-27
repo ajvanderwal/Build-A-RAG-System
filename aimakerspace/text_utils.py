@@ -36,6 +36,46 @@ class TextFileLoader:
         return self.documents
 
 
+from PyPDF2 import PdfReader
+
+
+class PDFFileLoader:
+    def __init__(self, path: str):
+        self.documents = []
+        self.path = path
+
+    def load(self):
+        if os.path.isdir(self.path):
+            self.load_directory()
+        elif os.path.isfile(self.path) and self.path.endswith(".pdf"):
+            self.load_file()
+        else:
+            raise ValueError(
+                "Provided path is neither a valid directory nor a .pdf file."
+            )
+
+    def load_file(self):
+        with open(self.path, "rb") as f:
+            pdf_reader = PdfReader(f)
+            for page in pdf_reader.pages:
+                text = page.extract_text()
+                self.documents.append(text)
+
+    def load_directory(self):
+        for root, _, files in os.walk(self.path):
+            for file in files:
+                if file.endswith(".pdf"):
+                    with open(os.path.join(root, file), "rb") as f:
+                        pdf_reader = PdfReader(f)
+                        for page in pdf_reader.pages:
+                            text = page.extract_text()
+                            self.documents.append(text)
+
+    def load_documents(self):
+        self.load()
+        return self.documents
+
+
 class CharacterTextSplitter:
     def __init__(
         self,
@@ -51,8 +91,21 @@ class CharacterTextSplitter:
 
     def split(self, text: str) -> List[str]:
         chunks = []
-        for i in range(0, len(text), self.chunk_size - self.chunk_overlap):
-            chunks.append(text[i : i + self.chunk_size])
+        chunk = ""
+        for char in text:
+            if char == "\n":
+                if len(chunk) > self.chunk_size:
+                    chunks.append(chunk)
+                    chunk = ""
+                else:
+                    chunk += char
+            else:
+                chunk += char
+                if len(chunk) >= self.chunk_size:
+                    chunks.append(chunk)
+                    chunk = ""
+        if chunk:
+            chunks.append(chunk)
         return chunks
 
     def split_texts(self, texts: List[str]) -> List[str]:
